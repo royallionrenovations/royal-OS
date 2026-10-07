@@ -1,0 +1,28 @@
+{
+  "name": "royal-lion-os",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Royal Lion OS - the private AI-powered operating system for Royal Lion Renovations LLC",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
