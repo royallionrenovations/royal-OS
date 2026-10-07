@@ -7,10 +7,13 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * The system prompt for contract generation. It is sent to their model, not
- * printed anywhere the customer sees, and it keeps the AI inside the boundary
- * the owner set: residential remodeling in Lee County, Florida.
+ * The daily briefing. Royal reads the owner's own numbers.
+ *
+ * Every figure is counted on the server, from the real tables, before the model
+ * sees anything. The model is told to say a figure is unavailable rather than
+ * invent one, so the briefing cannot flatter you with numbers you do not have.
  */
+
 const HOUSE_STYLE = `You are Royal, the business intelligence assistant for Royal Lion Renovations LLC,
 a residential remodeling and renovation company in Lee County, Florida. The owner is the CEO and you answer to them.
 
@@ -43,7 +46,6 @@ type BriefingContext = {
   notes: string[];
 };
 
-/** Every number is counted here, on the server, from the real tables. */
 async function buildContext(): Promise<BriefingContext> {
   const sb = supabaseServer();
 
@@ -76,7 +78,11 @@ async function buildContext(): Promise<BriefingContext> {
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
 
-  let revenue = 0, expenses = 0, cogs = 0, cash = 0, taxHeld = 0;
+  let revenue = 0;
+  let expenses = 0;
+  let cogs = 0;
+  let cash = 0;
+  let taxHeld = 0;
   const serviceRevenue: Record<string, number> = {};
 
   accRows.forEach((a) => {
@@ -102,7 +108,9 @@ async function buildContext(): Promise<BriefingContext> {
   const grossMargin = revenue ? (revenue - cogs) / revenue : 0;
   const netProfit = revenue - expenses;
 
-  let openPipeline = 0, hot = 0, unanswered = 0;
+  let openPipeline = 0;
+  let hot = 0;
+  let unanswered = 0;
   leadRows.forEach((l) => {
     if (!['WON', 'LOST', 'NOT_QUALIFIED', 'DISMISSED'].includes(l.status)) {
       openPipeline += Number(l.estimated_value) || 0;
@@ -111,7 +119,10 @@ async function buildContext(): Promise<BriefingContext> {
     if (['NEW', 'REVIEW', 'QUALIFIED'].includes(l.status)) unanswered += 1;
   });
 
-  const estimatesWaiting = estRows.filter((e) => ['DRAFT', 'AI_REVIEW', 'WAITING_APPROVAL'].includes(e.status)).length;
+  const estimatesWaiting = estRows.filter((e) =>
+    ['DRAFT', 'AI_REVIEW', 'WAITING_APPROVAL'].includes(e.status)
+  ).length;
+
   const overdueInvoices = invRows.filter((i) => i.status === 'OVERDUE').length;
 
   const adSpend = chanRows.reduce((s, c) => s + (Number(c.spend) || 0), 0);
@@ -125,13 +136,22 @@ async function buildContext(): Promise<BriefingContext> {
     .filter((p) => p.type === 'Expense' && new Date(p.txn_date).getMonth() === thisMonth)
     .reduce((s, p) => s + (Number(p.amount) || 0), 0);
 
-  const leadingService = Object.keys(serviceRevenue).sort((a, b) => serviceRevenue[b] - serviceRevenue[a])[0] || null;
+  const leadingService =
+    Object.keys(serviceRevenue).sort((a, b) => serviceRevenue[b] - serviceRevenue[a])[0] || null;
 
   const notes: string[] = [];
-  if (!rows.length) notes.push('No business transactions are recorded yet, so revenue figures are genuinely zero rather than missing.');
-  if (grossMargin && grossMargin < 0.35) notes.push('Gross margin is below the 35% floor set in Settings.');
-  if (overdueInvoices) notes.push(overdueInvoices + ' invoice(s) are past their due date.');
-  if (hot) notes.push(hot + ' lead(s) are scoring 80 or above and deserve a call today.');
+  if (!rows.length) {
+    notes.push('No business transactions are recorded yet, so revenue figures are genuinely zero rather than missing.');
+  }
+  if (grossMargin && grossMargin < 0.35) {
+    notes.push('Gross margin is below the 35% floor set in Settings.');
+  }
+  if (overdueInvoices) {
+    notes.push(overdueInvoices + ' invoice(s) are past their due date.');
+  }
+  if (hot) {
+    notes.push(hot + ' lead(s) are scoring 80 or above and deserve a call today.');
+  }
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -145,6 +165,7 @@ async function buildContext(): Promise<BriefingContext> {
     hotLeads: hot,
     unanswered,
     estimatesWaiting,
+    overdueInvoices,
     cashOnHand: money(cash),
     taxReserve: money(Math.max(0, netProfit) * 0.27) + ' suggested, ' + money(taxHeld) + ' actually in the tax reserve',
     leadingService,
@@ -200,7 +221,7 @@ export async function POST() {
         'Keep it under 160 words. Follow this shape:\n' +
         '- Two or three sentences on how the business is doing, using the numbers.\n' +
         '- Anything that needs attention, named with its figure.\n' +
-        '- Then a numbered list of at most four priorities for today, each one a real action, each one drawn from the context.\n' +
+        '- Then a numbered list of at most four priorities for today, each a real action drawn from the context.\n' +
         'If a figure is unavailable, say so instead of guessing.'
     }
   ];
